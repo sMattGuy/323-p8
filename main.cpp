@@ -68,7 +68,7 @@ class AStar{
 	int computeGstar(AStarNode* node){
 		return node->parent->gStar + 1;
 	}
-	int computeHStar(AStarNode* node){
+	int computeHstar(AStarNode* node){
 		int dist = 0;
 		for(int i=0;i<9;i++){
 			dist += this->table[node->configuration[i]][this->goalNode->configuration[i]];
@@ -76,7 +76,7 @@ class AStar{
 		return dist;
 	}
 	bool isGoalNode(AStarNode* node){
-		return this->match(node->configuration[i], this->goalNode->configuration[i]);
+		return this->match(node->configuration, this->goalNode->configuration);
 	}
 	void openInsert(AStarNode* node){
 		AStarNode* reader = this->open;
@@ -148,7 +148,9 @@ class AStar{
 	AStarNode* createNewChild(int i, int j, AStarNode* currentNode, AStarNode* listHead){
 		//create new node to hold next move
 		AStarNode* newNode = new AStarNode();
-		newNode->configuration = currentNode->configuration;
+		for(int k=0;k<9;k++){
+			newNode->configuration[k] = currentNode->configuration[k];
+		}
 		//perform the move
 		int temp = 0;
 		temp = newNode->configuration[i];
@@ -157,7 +159,7 @@ class AStar{
 		//update new nodes g h f
 		newNode->parent = currentNode;
 		newNode->gStar = this->computeGstar(newNode);
-		newNode->hStar = this->computeHStar(newNode);
+		newNode->hStar = this->computeHstar(newNode);
 		newNode->fStar = newNode->gStar + newNode->hStar;
 		//check if to add it to new list
 		if(!this->checkAncestors(newNode, currentNode)){
@@ -174,13 +176,13 @@ class AStar{
 		AStarNode* listHead = new AStarNode();
 		for(int i=0;i<9;i++){
 			if(currentNode->configuration[i] == 0){
-				if(i+1<9){
+				if(i+1<9 && i!=2 && i!=5){
 					listHead = createNewChild(i, i+1, currentNode, listHead);
 				}
 				if(i+3<9){
 					listHead = createNewChild(i, i+3, currentNode, listHead);
 				}
-				if(i-1 >= 0){
+				if(i-1 >= 0 && i!=6 && i!=3){
 					listHead = createNewChild(i, i-1, currentNode, listHead);
 				}
 				if(i-3 >= 0){
@@ -191,9 +193,8 @@ class AStar{
 		}
 		return nullptr;
 	}
-	void printList(AStarNode* listHead, std::ofstream& output, std::string listName){
+	void printList(AStarNode* listHead, std::ofstream& output){
 		AStarNode* reader = listHead;
-		output<<"Printing "<<listName<<": \n";
 		while(reader != nullptr){
 			reader->printNode(output);
 			reader = reader->next;
@@ -252,17 +253,19 @@ int main(int argc, char* argv[]){
 	AStarNode* startNode = new AStarNode();
 	AStarNode* goalNode = new AStarNode();
 	//assign configs from files
-	startNode->configuration = startConfig;
-	goalNode->configuration = goalConfig;
+	for(int i=0;i<9;i++){
+		startNode->configuration[i] = startConfig[i];
+		goalNode->configuration[i] = goalConfig[i];
+	}
 	//set search goal and start to new nodes
-	AStarSearch->startNode = &startNode;
-	AStarSearch->goalNode = &goalNode;
+	AStarSearch->startNode = startNode;
+	AStarSearch->goalNode = goalNode;
 	//create dummy nodes for open and close
 	AStarSearch->open = new AStarNode();
 	AStarSearch->close = new AStarNode();
 	//step 1
 	AStarSearch->startNode->gStar = 0;
-	AStarSearch->startNode->hStar = AStarSearch->computeHStar(AStarSearch->startNode);
+	AStarSearch->startNode->hStar = AStarSearch->computeHstar(AStarSearch->startNode);
 	AStarSearch->startNode->fStar = AStarSearch->startNode->gStar + AStarSearch->startNode->hStar;
 	AStarSearch->openInsert(AStarSearch->startNode);
 	AStarNode* currentNode = new AStarNode();
@@ -293,7 +296,7 @@ int main(int argc, char* argv[]){
 			//step 7
 			AStarNode* spot = AStarSearch->findSpot(AStarSearch->close, child);
 			//step 8
-			if(spot->next != nullptr && spot->next->fStar > child->fStar){
+			if(spot != nullptr && spot->next != nullptr && spot->next->fStar > child->fStar){
 				AStarSearch->closeDelete(spot);
 			}
 			//step 9
@@ -302,32 +305,27 @@ int main(int argc, char* argv[]){
 		//step 11
 		AStarSearch->closeInsert(currentNode);
 		//step 12
-		if(loopCounter <= 20){
+		if(loopCounter < 20){
 			debug<<"Loop:"<<loopCounter<<std::endl;
 			debug<<"This is Open list:\n";
 			AStarSearch->printList(AStarSearch->open, debug);
 			debug<<"This is Close list:\n";
 			AStarSearch->printList(AStarSearch->close, debug);
+			loopCounter++;
 		}
 		else if(loopCounter == 20){
-			debug<<"Over 20 loops, only printing every 10 now\n";
+			debug<<"Over 20 loops, this is the last that will be printed\n";
 			debug<<"Loop:"<<loopCounter<<std::endl;
 			debug<<"This is Open list:\n";
 			AStarSearch->printList(AStarSearch->open, debug);
 			debug<<"This is Close list:\n";
 			AStarSearch->printList(AStarSearch->close, debug);
+			loopCounter++;
 		}
-		else if(loopCounter % 10 == 0){
-			debug<<"Loop:"<<loopCounter<<std::endl;
-			debug<<"This is Open list:\n";
-			AStarSearch->printList(AStarSearch->open, debug);
-			debug<<"This is Close list:\n";
-			AStarSearch->printList(AStarSearch->close, debug);
+		if(AStarSearch->open->next == nullptr && !AStarSearch->isGoalNode(currentNode)){
+			results<<"No solution can be found in the search!\n";
+			return 0;
 		}
-		loopCounter++;
-	}
-	if(AStarSearch->open->next == nullptr && !AStarSearch->isGoalNode(currentNode)){
-		results<<"No solution can be found in the search!\n";
 	}
 	return 0;
 }
